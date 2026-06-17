@@ -10,3 +10,10 @@ data/climbing/raw/
 data/grasp/raw/
 experiments/*.json
 .DS_Store
+data/climbing/annotations
+data/climbing/raw
+data/grasp/annotations
+data/grasp/raw
+experiments/results/
+.pytest_cache/
+dist/
