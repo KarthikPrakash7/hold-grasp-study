@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.pt
+*.pth
+*.onnx
+data/climbing/raw/
+data/grasp/raw/
+experiments/*.json
+.DS_Store
