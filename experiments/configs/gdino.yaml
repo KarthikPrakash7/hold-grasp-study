@@ -1,0 +1,10 @@
+model: gdino
+model_id: IDEA-Research/grounding-dino-tiny
+box_threshold: 0.35
+text_threshold: 0.25
+classes:
+  - jug
+  - crimp
+  - sloper
+  - pinch
+  - pocket
