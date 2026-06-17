@@ -68,20 +68,37 @@ def detect(model: str, image: Path, out: Path, checkpoint: str | None):
 @click.option("--annotations", required=True, type=click.Path(exists=True, path_type=Path))
 @click.option("--out", default=None, type=click.Path(path_type=Path),
               help="Append metrics to this JSON file (creates if missing)")
-def evaluate(predictions: Path, annotations: Path, out: Path | None):
+@click.option("--gallery", is_flag=True, default=False, help="Save error gallery images to predictions-dir/gallery/")
+@click.option("--image-dir", default=None, type=click.Path(path_type=Path), help="Directory containing raw images (required for --gallery)")
+def evaluate(predictions: Path, annotations: Path, out: Path | None, gallery: bool, image_dir: Path | None):
     """Evaluate cached predictions against COCO ground-truth annotations."""
+    from holdgrasp.eval.matching import MatchResult
+    from holdgrasp.eval.metrics import count_error_per_image
+
     gt_by_image = load_coco_gt(annotations)
     by_model = _load_prediction_dir(predictions)
 
     all_results: dict = {}
     for model_id, pred_by_image in sorted(by_model.items()):
-        all_gt: list[Detection] = []
-        all_pred: list[Detection] = []
-        for image_id in gt_by_image:
-            all_gt.extend(gt_by_image[image_id])
-            all_pred.extend(pred_by_image.get(image_id, []))
+        # Bug #1 & #2 fix: match per image so predictions never cross image boundaries
+        all_matched = []
+        all_unmatched_gt = []
+        all_unmatched_pred = []
 
-        match_result = match_detections(all_gt, all_pred)
+        for image_id in set(gt_by_image) | set(pred_by_image):
+            gt = gt_by_image.get(image_id, [])
+            pred = pred_by_image.get(image_id, [])
+            r = match_detections(gt, pred)
+            all_matched.extend(r.matched)
+            all_unmatched_gt.extend(r.unmatched_gt)
+            all_unmatched_pred.extend(r.unmatched_pred)
+
+        match_result = MatchResult(
+            matched=all_matched,
+            unmatched_gt=all_unmatched_gt,
+            unmatched_pred=all_unmatched_pred,
+        )
+
         metrics = compute_metrics(match_result, HOLD_CLASSES)
         cm = confusion_matrix(match_result, HOLD_CLASSES)
         macro_f1 = sum(metrics[c].f1 for c in HOLD_CLASSES) / len(HOLD_CLASSES)
@@ -98,6 +115,28 @@ def evaluate(predictions: Path, annotations: Path, out: Path | None):
         for i, cls in enumerate(HOLD_CLASSES):
             row = "  ".join(f"{cm[i, j]:>5}" for j in range(len(HOLD_CLASSES)))
             click.echo(f"{cls[:5]:>5}  {row}")
+
+        # Bug #3 fix: wire count_error_per_image
+        errors = count_error_per_image(gt_by_image, pred_by_image, HOLD_CLASSES)
+        click.echo("\nCount error (pred - gt) per class, summed across images:")
+        click.echo(f"{'Class':<10} {'Error':>6}")
+        click.echo("-" * 20)
+        for cls in HOLD_CLASSES:
+            total_err = sum(img_errs.get(cls, 0) for img_errs in errors.values())
+            click.echo(f"{cls:<10} {total_err:>+6}")
+
+        # Bug #4 fix: wire error_gallery when --gallery flag is set
+        if gallery:
+            if not image_dir:
+                raise click.ClickException("--image-dir required when --gallery is used")
+            from holdgrasp.eval.viz import error_gallery as _error_gallery
+            image_paths = {
+                p.stem: p
+                for p in image_dir.iterdir()
+                if p.suffix.lower() in {".jpg", ".jpeg", ".png"}
+            }
+            _error_gallery(image_paths, gt_by_image, pred_by_image, predictions, model_id)
+            click.echo(f"Gallery saved → {predictions}/gallery/{model_id}/")
 
         all_results[model_id] = {
             "metrics": {
