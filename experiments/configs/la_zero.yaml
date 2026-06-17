@@ -1,0 +1,9 @@
+model: la-zero
+model_id: nvidia/locate-anything-3b
+device: cuda
+classes:
+  - jug
+  - crimp
+  - sloper
+  - pinch
+  - pocket
