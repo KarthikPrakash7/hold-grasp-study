@@ -1,0 +1,11 @@
+# Paths relative to this file. Roboflow YOLO export: copy images and labels here.
+path: .
+train: train/images
+val: val/images
+nc: 5
+names:
+  0: jug
+  1: crimp
+  2: sloper
+  3: pinch
+  4: pocket

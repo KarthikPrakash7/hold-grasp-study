@@ -1,0 +1,12 @@
+# Run on PC (GPU):  yolo train cfg=experiments/configs/yolo_finetune.yaml
+model: yolo11n.pt
+data: data/climbing/train_yolo/data.yaml
+epochs: 100
+imgsz: 640
+batch: 16
+project: experiments/results
+name: yolo-ft
+save: true
+device: 0
+workers: 4
+patience: 20
